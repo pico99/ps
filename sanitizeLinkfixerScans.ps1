@@ -1,5 +1,5 @@
 <# sample command line
-.\sanitizeLinkfixerScans.ps1 -SourcePath "G:\Shared drives\File Migration\LinkFixer Scans\" -fileFilter "Scan Detail*" -OFilePrefix "sanitized-"
+.\sanitizeLinkfixerScans.ps1 -SourcePath "G:\Shared drives\LinkFixer Scans\" -fileFilter "Scan Detail*" -OFilePrefix "sanitized-"
 
 #assign params from command line
 #>
