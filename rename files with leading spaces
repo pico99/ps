@@ -1,0 +1,155 @@
+<#
+.SYNOPSIS
+    Renames files that have a leading space in their filename.
+.DESCRIPTION
+    This script searches for files within a specified directory (and optionally its subdirectories)
+    whose names begin with one or more space characters. It then renames these files by
+    removing all leading spaces.
+    Includes a -WhatIf parameter to preview changes without applying them.
+.PARAMETER Path
+    The directory path to search for files. If not specified, it defaults to the current directory.
+.PARAMETER Recurse
+    If specified, the script will search for files in all subdirectories of the given Path.
+.PARAMETER WhatIf
+    If specified, the script will display the operations it would perform without actually
+    executing them. This allows for a preview of the changes.
+.EXAMPLE
+    .\Rename-LeadingSpaceFiles.ps1 -Path "C:\MyDocuments\WorkFiles"
+    Description: Renames files with leading spaces directly under "C:\MyDocuments\WorkFiles".
+
+.EXAMPLE
+    .\Rename-LeadingSpaceFiles.ps1 -Path "D:\Photos" -Recurse
+    Description: Renames files with leading spaces in "D:\Photos" and all its subfolders.
+
+.EXAMPLE
+    .\Rename-LeadingSpaceFiles.ps1 -Path "C:\Temp" -Recurse -WhatIf
+    Description: Shows which files in "C:\Temp" and its subfolders would be renamed,
+                 but does not actually rename them.
+
+.EXAMPLE
+    Get-ChildItem 'C:\Downloads' | .\Rename-LeadingSpaceFiles.ps1 -Recurse
+    Description: Gets items from C:\Downloads and pipes them to the script.
+                 The script will then process only the files (not directories) from the input.
+                 If a directory is piped, it will be processed as if -Path was used.
+
+.OUTPUTS
+    None by default, unless -Verbose or -WhatIf is used.
+    When -WhatIf is used, it outputs messages indicating what rename operations would occur.
+.NOTES
+    Author: Gemini
+    Date: 2025-05-15
+    It's highly recommended to run the script with -WhatIf first to ensure it targets the correct files.
+    The script handles filenames with multiple leading spaces by removing all of them.
+#>
+[CmdletBinding(SupportsShouldProcess = $true)] # Enables -WhatIf and -Confirm
+param (
+    [Parameter(Position = 0, ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true)]
+    [string]$Path = (Get-Location).Path, # Default to current directory
+
+    [Parameter()]
+    [switch]$Recurse
+)
+
+begin {
+    Write-Verbose "Script started."
+    Write-Verbose "Target Path: $Path"
+    Write-Verbose "Recurse: $($Recurse.IsPresent)"
+    $filesProcessed = 0
+    $filesRenamed = 0
+}
+
+process {
+    # Determine if the input $Path is a directory or a file
+    # This allows the script to handle piped input from Get-ChildItem more gracefully
+    $itemsToProcess = @()
+    if (Test-Path -Path $Path -PathType Container) {
+        # Path is a directory, get child items (files)
+        $getChildItemParams = @{
+            Path = $Path
+            File = $true # Only get files
+        }
+        if ($Recurse) {
+            $getChildItemParams.Recurse = $true
+        }
+        try {
+            $itemsToProcess = Get-ChildItem @getChildItemParams -ErrorAction SilentlyContinue
+        }
+        catch {
+            Write-Error "Error accessing path '$Path': $($_.Exception.Message)"
+            return
+        }
+    }
+    elseif (Test-Path -Path $Path -PathType Leaf) {
+        # Path is a file (likely from pipeline)
+        $itemsToProcess = Get-Item -Path $Path -ErrorAction SilentlyContinue
+    }
+    else {
+        Write-Warning "Path '$Path' does not exist or is not a file/directory. Skipping."
+        return
+    }
+
+
+    foreach ($FileItem in $itemsToProcess) {
+        $filesProcessed++
+        $OriginalFullName = $FileItem.FullName
+        $OriginalName = $FileItem.Name
+        $DirectoryPath = $FileItem.DirectoryName
+
+        # Check if the filename starts with a space
+        if ($OriginalName -match "^\s+.*") {
+            Write-Verbose "Found file with leading space(s): '$OriginalFullName'"
+
+            # Remove leading space(s) from the filename
+            # The TrimStart() method removes all occurrences of specified characters from the beginning of a string.
+            # If no characters are specified, it removes whitespace.
+            $NewName = $OriginalName.TrimStart()
+
+            # Ensure the new name is not empty or just spaces (which TrimStart would make empty)
+            if ([string]::IsNullOrWhiteSpace($NewName)) {
+                Write-Warning "Skipping file '$OriginalFullName' as removing leading spaces would result in an empty filename."
+                continue
+            }
+
+            # Construct the new full path
+            $NewFullName = Join-Path -Path $DirectoryPath -ChildPath $NewName
+
+            # Check if a file with the new name already exists
+            if (Test-Path -Path $NewFullName) {
+                Write-Warning "Skipping rename of '$OriginalFullName': A file named '$NewName' already exists in '$DirectoryPath'."
+                continue
+            }
+
+            Write-Host "Attempting to rename '$OriginalName' to '$NewName' in directory '$DirectoryPath'"
+
+            # Rename the file
+            # The $PSCmdlet.ShouldProcess method handles the -WhatIf and -Confirm parameters.
+            if ($PSCmdlet.ShouldProcess($OriginalFullName, "Rename to '$NewFullName'")) {
+                try {
+                    Rename-Item -Path $OriginalFullName -NewName $NewName -ErrorAction Stop
+                    Write-Host "Successfully renamed '$OriginalFullName' to '$NewFullName'" -ForegroundColor Green
+                    $filesRenamed++
+                }
+                catch {
+                    Write-Error "Failed to rename '$OriginalFullName' to '$NewName'. Error: $($_.Exception.Message)"
+                }
+            }
+        }
+        else {
+            Write-Verbose "File '$OriginalFullName' does not start with a space. Skipping."
+        }
+    }
+}
+
+end {
+    Write-Verbose "Script finished."
+    Write-Host "Total files scanned: $filesProcessed"
+    Write-Host "Total files renamed: $filesRenamed"
+    if ($PSCmdlet.ShouldProcess("Summary", "Display summary of operations")) {
+        # This block is mainly for -WhatIf scenarios to confirm completion.
+        if ($filesRenamed -eq 0 -and $filesProcessed -gt 0) {
+            Write-Host "No files required renaming."
+        } elseif ($filesProcessed -eq 0) {
+            Write-Host "No files found to process in the specified path(s)."
+        }
+    }
+}
