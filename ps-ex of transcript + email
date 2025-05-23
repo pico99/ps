@@ -1,0 +1,63 @@
+<#
+Create a file and folder on the root of the Drive and set permissions how you want them on the target items.
+
+#>
+
+Send-MailMessage -SmtpServer smtp.mydomain.com -To user@mydomain.com -From noreply@mydomain.com -Subject "Permissions Update Started" 
+$TranscriptPath = "C:\Users\me\Documents\Migration.txt"
+Start-Transcript -Path $TranscriptPath
+
+
+#Specify drive letter (tested on another machine with a different drive).
+$DriveLetter = "D:"
+
+#Get all file system objects in the folder
+$All = Get-ChildItem "$DriveLetter\myfolder"
+
+#Create an array of just the files
+$Files = $All | ? {$_.PSIsContainer -ne $true}
+
+#read permissions from "template" file
+$FileACL = Get-Acl "$DriveLetter\FileACL.txt"
+
+#set permissions on each file in the root of the Dept share
+foreach ($f in $Files){
+    Write-Host $f.FullName
+    Set-Acl $f.FullName $FileACL
+}
+
+#read permissions from "template" folder
+$FolderACL = Get-acl "$DriveLetter\TargetFolderACL"
+
+#Create array of all folders
+$Folders = $All | ? {$_.PSIsContainer -eq $true}
+#$Folders.Count
+
+#Create array of folder names that are not migrating
+$ExcludedFolders = @("array members")
+#Remove the folders that are not migrating from the array
+$Folders = $Folders | ? {$_.Name -notin $ExcludedFolders}
+#$Folders.Count
+
+#Manually add subfolders that had inheritance disabled
+$BuriedFoldersWPerms = @("$DriveLetter\one","$DriveLetter\two","$DriveLetter\three")
+
+#Update folder array to add the disabled inheritance sub-folders
+$BuriedFoldersWPerms.ForEach({
+    $Folders += Get-Item $_
+})
+#$Folders.Count
+
+#process all the folders and update permissions - I put a timestamp between folders, just to see which ones took longest, etc.
+foreach ($f in $Folders){
+    Write-Host $f.FullName
+    Get-Date
+    Set-Acl $f.FullName $FolderACL
+}
+
+
+#stop logging
+Stop-Transcript
+
+#email myself so I know it finished and attach the logfile
+Send-MailMessage -Attachments $TranscriptPath -SmtpServer smtp.mydomain.com -To user@mydomain.com -From noreply@mydomain.com -Subject "Permissions Update Complete" 
