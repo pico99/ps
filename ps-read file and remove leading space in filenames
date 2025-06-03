@@ -33,9 +33,9 @@
 .EXAMPLE
     Expected text file format of paths\files to be renamed (can also use mapped drive instead of \\<server>\<share>),
         one path/file per line:
-    \\<host>\<share>\ Potential Spam   TEB - 914 205 field meeting.msg
-    \\<host>\<share>\ScanDocuments\Direct_Debit\Daily Work\2016\JAN 2016\6\ 100_8957622222_01062016.pdf
-    b:\ Potential Spam   TEB - 914 205 field meeting.msg
+    \\NJHYFS\depts\ENGIN\Doug R\Teterboro Airport Submittals\ Potential Spam   TEB - 914 205 United Water field meeting.msg
+    \\NJHYFS\depts\ScanDocuments\Direct_Debit\Daily Work\2016\JAN 2016\6\ 100_8957622222_01062016.pdf
+    b:\ENGIN\Doug R\Teterboro Airport Submittals\ Potential Spam   TEB - 914 205 United Water field meeting.msg
     b:\ScanDocuments\Direct_Debit\Daily Work\2016\JAN 2016\6\ 100_8957622222_01062016.pdf
 .OUTPUTS
     None by default, unless -Verbose or -WhatIf is used.
